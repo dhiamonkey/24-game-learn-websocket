@@ -26,6 +26,11 @@ const SUBMIT_COOLDOWN_MS = 250;
 const HOST_GRACE_MS = 5 * 60 * 1000;   // room survives a host drop-out this long
 const PLAYER_GRACE_MS = 2 * 60 * 1000; // disconnected guests are removed after this
 const NAME_MAX = 20;
+// Vercel closes a WebSocket when its function hits max duration (300s on Hobby).
+// VERCEL is set automatically there; CONN_LIMIT_S overrides it (0 = no limit).
+const CONN_LIMIT_MS = process.env.CONN_LIMIT_S !== undefined
+  ? Number(process.env.CONN_LIMIT_S) * 1000
+  : (process.env.VERCEL ? 300 * 1000 : 0);
 
 /* ------------------------------------------------------------------ */
 /* Fractions (exact arithmetic, so 8 / (3 - 8 / 3) really equals 24)   */
@@ -390,7 +395,7 @@ wss.on('connection', (ws) => {
   ws.meta = {};
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
-  send(ws, { type: 'hello', hostKeyRequired: !!HOST_KEY });
+  send(ws, { type: 'hello', hostKeyRequired: !!HOST_KEY, connLimitMs: CONN_LIMIT_MS });
 
   ws.on('message', (data) => {
     let msg;

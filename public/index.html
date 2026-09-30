@@ -38,6 +38,9 @@ button { font-family: var(--font-sans); color: inherit; }
 .conn { font: 400 .8571428571rem/1.4 var(--font-mono); color: var(--lum-grey-foot); display: flex; align-items: center; gap: .5rem; }
 .dot { width: .6rem; height: .6rem; border-radius: 50%; background: var(--lum-warm-grey); display: inline-block; flex: none; }
 .dot.on { background: var(--lum-purple); }
+.dot.warn { background: var(--lum-orange); }
+.conn__timer { color: var(--lum-ink-body); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 520px) { .conn__since { display: none; } }
 
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; border: none; cursor: pointer;
@@ -318,6 +321,9 @@ input.code { font: 400 1.5rem/1.2 var(--font-mono); letter-spacing: .3em; text-t
   let tick = null;
   let pendingAction = null;
   let kickArmed = null;
+  let connOpenedAt = null; // local time this socket opened
+  let connLimitMs = 0;     // server says how long a socket may live (0 = no limit)
+  let connTick = null;
 
   const serverNow = () => Date.now() + clockOffset;
   const isHost = () => room && me && room.hostId === me.id;
@@ -325,12 +331,15 @@ input.code { font: 400 1.5rem/1.2 var(--font-mono); letter-spacing: .3em; text-t
   /* ---------- Connection ---------- */
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    stopConnTimer();
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     setConn(false, 'Connecting');
 
     ws.onopen = () => {
       retry = 0;
-      setConn(true, 'Connected');
+      connOpenedAt = Date.now();
+      renderConn();
+      connTick = setInterval(renderConn, 1000);
       const session = store.get('v24.session');
       if (session && session.code && session.token) {
         ws.send(JSON.stringify({ type: 'join', code: session.code, token: session.token, name: $('name').value }));
@@ -341,6 +350,7 @@ input.code { font: 400 1.5rem/1.2 var(--font-mono); letter-spacing: .3em; text-t
     };
     ws.onmessage = (ev) => { try { handle(JSON.parse(ev.data)); } catch (e) { console.error(e); } };
     ws.onclose = () => {
+      stopConnTimer();
       setConn(false, 'Reconnecting');
       const wait = Math.min(8000, 500 * 2 ** retry++);
       setTimeout(connect, wait);
@@ -350,8 +360,30 @@ input.code { font: 400 1.5rem/1.2 var(--font-mono); letter-spacing: .3em; text-t
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg));
     else { pendingAction = msg; }
   }
-  function setConn(on, text) {
-    $('conn').innerHTML = `<span class="dot${on ? ' on' : ''}"></span><span>${esc(text)}</span>`;
+  function setConn(on, text, timer = '', warn = false, title = '') {
+    const el = $('conn');
+    el.title = title;
+    el.innerHTML = `<span class="dot${on ? (warn ? ' warn' : ' on') : ''}"></span><span>${esc(text)}</span>`
+      + (timer ? `<span class="conn__timer">${timer}</span>` : '');
+  }
+  function stopConnTimer() {
+    clearInterval(connTick);
+    connTick = null;
+    connOpenedAt = null;
+  }
+  const clock = (t) => new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  function renderConn() {
+    if (!connOpenedAt) return;
+    const elapsed = Date.now() - connOpenedAt;
+    const since = `<span class="conn__since">since ${esc(clock(connOpenedAt))} · </span>`;
+    if (!connLimitMs) {
+      setConn(true, 'Connected', `${since}${mmss(elapsed)}`, false, 'This connection has no time limit.');
+      return;
+    }
+    const left = connLimitMs - elapsed;
+    setConn(true, 'Connected', `${since}${mmss(left)} left`, left <= 30000,
+      `The server closes each connection after ${mmss(connLimitMs)}. The page reconnects on its own when it does.`);
   }
 
   /* ---------- Messages from the server ---------- */
@@ -359,6 +391,8 @@ input.code { font: 400 1.5rem/1.2 var(--font-mono); letter-spacing: .3em; text-t
     switch (msg.type) {
       case 'hello':
         hostKeyRequired = msg.hostKeyRequired;
+        connLimitMs = Number(msg.connLimitMs) || 0;
+        renderConn();
         $('hostKeyField').hidden = !hostKeyRequired;
         break;
       case 'welcome':
