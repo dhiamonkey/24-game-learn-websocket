@@ -4,7 +4,7 @@ A head-to-head 24 game over WebSockets. The host creates a room, shares a five-c
 
 ## Run it
 
-Needs Node 18 or later.
+Needs Node 24.
 
 ```bash
 npm install
