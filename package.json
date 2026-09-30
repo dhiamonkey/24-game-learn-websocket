@@ -1,0 +1,13 @@
+{
+  "name": "24-versus",
+  "version": "1.0.0",
+  "description": "Head-to-head 24 game over WebSockets. The host invites players with a room code and can kick them.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
