@@ -28,6 +28,8 @@ Open http://localhost:3000. Set `PORT` to change the port.
 
 Rooms live in memory, so run a single instance (no load-balanced replicas) and expect a restart to end open games.
 
+On Vercel, players can occasionally drop out of a game. See [VERCEL.md](VERCEL.md) for why.
+
 Behind a reverse proxy, pass WebSocket upgrades through on `/ws`. For nginx:
 
 ```nginx
