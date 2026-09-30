@@ -428,4 +428,7 @@ if (require.main === module) {
   server.listen(PORT, () => log(`24 versus running on http://localhost:${PORT}${HOST_KEY ? ' (host key required)' : ''}`));
 }
 
-module.exports = { solve, checkExpression, dealHand, server };
+// Vercel runs this file as a function and expects the HTTP server as the export.
+// The helpers hang off it so require('./server').solve etc. still work.
+module.exports = server;
+Object.assign(module.exports, { solve, checkExpression, dealHand, server });
