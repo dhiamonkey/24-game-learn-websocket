@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js"
   },
-  "engines": { "node": "24.x" },
+  "engines": { "node": ">=22" },
   "dependencies": {
     "ws": "^8.18.0"
   }
